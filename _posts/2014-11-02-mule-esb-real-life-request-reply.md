@@ -6,7 +6,7 @@ Real-life batch-processing scenario - multiple records in single request, record
 
 ![initial-flow](/images/sync-scatter-gather-initial-process.png "Initial flow")
 
-{% highlight xml %}
+{% highlight xml linenos %}
 <flow name="initial-process-flow" doc:name="initial-process-flow">
 		<http:inbound-endpoint exchange-pattern="request-response"
 			host="localhost" port="8181" path="initialProcess" doc:name="HTTP" />
@@ -47,7 +47,7 @@ In production usage there will be thousands of records. Current performance will
 
 ![Request-Reply-Active-Transaction](/images/request-reply-active-transaction.png "Request-Reply with active transaction")
 
-{% highlight xml %}
+{% highlight xml  %}
 <flow name="request-reply-flow" doc:name="request-reply-flow">
 		<http:inbound-endpoint exchange-pattern="request-response"
 			host="localhost" port="8181" path="requesReply" doc:name="HTTP" />
@@ -88,7 +88,7 @@ In production usage there will be thousands of records. Current performance will
 			doc:name="Aggregate Gryphon Results" timeout="120000" />
 		<vm:outbound-endpoint exchange-pattern="one-way"
 			path="reply" doc:name="reply" />
-	</flow
+	</flow>
 {% endhighlight %}
 
 Let's run the test and see how it works. Well, it doesn't work at all. Let's see what is going on.
@@ -124,8 +124,10 @@ INFO  2014-11-19 23:12:11,140 [call-LongRunningTask.stage1.11] LongRunningTask: 
 INFO  2014-11-19 23:12:11,142 [call-LongRunningTask.stage1.10] LongRunningTask: Task processed
 {% endhighlight %}
 **All tasks finished** before any **Task processed**? It means that aggregation step was executed without waiting for web service responses.
-Issue#2: Set up good processing strategies
+
+Issue #2: Set up good processing strategies
 ====
+
 Without processing strategies each stage is executed without waiting on results of previous stage. For the simplicity start with processing both flows synchronously:
 {% highlight xml %}
 <flow name="request-reply-long-task-split" doc:name="long-task-split" processingStrategy="synchronous">
@@ -154,7 +156,7 @@ org.mule.api.store.ObjectAlreadyExistsException
 
 After long and not so easy debugging new issue was identified:
 
-Issue#3: Splitter and foreach uses the same group and sequence id parameters
+Issue #3: Splitter and foreach uses the same group and sequence id parameters
 ====
 MULE_CORRELATION_SEQUENCE and MULE_CORRELATION_GROUP_SIZE are overwritten between foreach and splitter. The solution would be either to store original values for outer loop and restore them after nested loop is finished or separate those two iterations. It looks better to split two loops. After that looks like solution finally works!
 
@@ -190,6 +192,5 @@ INFO  2014-11-20 00:02:44,690 [main] MainFlow: All tasks finished: [org.mule.tra
 In terms of speed improvment is also significant - right now flows ends within 5 seconds
 
 
-Two options for fixing that. Either try to store and 
 
 - error handling (problems with correlation id containg correlation sequence)
