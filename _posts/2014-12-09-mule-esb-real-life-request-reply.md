@@ -2,9 +2,15 @@
 layout: post
 title: Mule ESB - Real Life Request-Reply
 ---
-Real-life batch-processing scenario - multiple records in single request, record data must by enhanced with information provided by 3rd party web service, then with fixed sizes (transport channel limitation) delivered to customer. Initial version of the flow below:
+Sample batch-processing scenario: 
 
-![initial-flow](/images/sync-scatter-gather-initial-process.png "Initial flow")
+1. Single HTTP request contains multiple records. 
+1. Data each in record must by enhanced with information provided by 3rd party web service, then messages with fixed number of records (exactly 3 - transport channel limitation) delivered to customer. 
+1. Processing is succesfull only if all records are delivered to customer - partial delivery is not allowed (that's why transaction is spanned on records processing and chunk delivery). 
+
+Initial version of the flow will look like this:
+
+![initial-flow](/images/real-life-request-reply/sync-scatter-gather-initial-process.png "Initial flow")
 
 {% highlight xml linenos %}
 <flow name="initial-process-flow" doc:name="initial-process-flow">
@@ -23,7 +29,7 @@ Real-life batch-processing scenario - multiple records in single request, record
 	</flow>
 {% endhighlight %}
 
-Long running task takes 1 second to complete. For the test input of 10 elements becasue of single thread mode total processing time takes 10 seconds and 4 messages are delivered to **finamMessage** vm endpoint.
+Long running task takes always 1 second to complete. For the test input of **10** elements processing time takes **10** seconds and **4** messages are delivered to **finalMessage** vm endpoint.
 
 {% highlight console %}
 INFO  2014-11-20 00:07:42,784 [main] LongRunningTask: Task processed
@@ -43,10 +49,17 @@ INFO  2014-11-20 00:07:53,924 [main] MainFlow: Final Message sent
 INFO  2014-11-20 00:07:53,932 [main] MainFlow: All tasks finished: [Ljava.lang.String;@daf22f0
 {% endhighlight %}
 
-In production usage there will be thousands of records. Current performance will not satisfy expectations . In order to improve processing time solution must be switched to multi-threaded mode. Mule ESB allows to refactor portion of single threaded process into some kind of map-reduce by using request-reply scope. So let's refactor inner **foreach** loop, execute **call-LongRunningTask** in separate threads, aggregate results and go back to single threaded processing. Results of 20 minutes of work below:
+Problems....
+====
 
-![Request-Reply-Active-Transaction](/images/request-reply-active-transaction.png "Request-Reply with active transaction")
+In production usage there will be millions of records. 
+Current performance will not satisfy expectations. In order to improve processing time solution must be switched from single-threaded to multi-threaded processing. Mule ESB allows to execute portion of single threaded process with many threads using [request-reply scope](http://www.mulesoft.org/documentation/display/current/Request-Reply+Scope). 
 
+So let's refactor inner **foreach** loop of the processing flow to execute **call-LongRunningTask** step in separate thread for each record, aggregate results and go back to single threaded processing to send output message - similarly to [scatter-gather pattern](http://www.eaipatterns.com/BroadcastAggregate.html). Results of 20 minutes of work below:
+
+![Request-Reply-Active-Transaction](/images/real-life-request-reply/request-reply-active-transaction1.png "Request-Reply with active transaction")
+
+Main flow with request-reply scope inside which request vm outbound endpoint sends records for multi-thread processing, and vm inbound endpoints receive processing results.
 {% highlight xml  %}
 <flow name="request-reply-flow" doc:name="request-reply-flow">
 		<http:inbound-endpoint exchange-pattern="request-response"
@@ -69,7 +82,11 @@ In production usage there will be thousands of records. Current performance will
 				category="MainFlow" doc:name="Logger" />
 		</transactional>
 	</flow>
+{% endhighlight %}
+![Request-Reply-Active-Transaction](/images/real-life-request-reply/request-reply-active-transaction2.png "Request-Reply Scatter step")
 
+Flow receives records sent to 'request' endpoint to split them and pass through 'aggr' vm endpoint for further processing. 
+{% highlight xml  %}
 	<flow name="request-reply-long-task-split" doc:name="long-task-split">
 		<vm:inbound-endpoint exchange-pattern="one-way"
 			path="request" doc:name="request" />
@@ -79,13 +96,17 @@ In production usage there will be thousands of records. Current performance will
 		<vm:outbound-endpoint exchange-pattern="one-way"
 			path="process" doc:name="aggr" />
 	</flow>
+{% endhighlight %}
+![Request-Reply-Active-Transaction](/images/real-life-request-reply/request-reply-active-transaction3.png "Request-Reply Gather step")
 
+Flow recieves record from 'aggr' endpoint, invoke **LongRunningTask**, waits for all records and send back aggregated results to 'reply' endpoint.
+{% highlight xml  %}
 	<flow name="request-reply-long-task-aggr" doc:name="long-task-aggr">
 		<vm:inbound-endpoint exchange-pattern="one-way"
 			path="process" doc:name="aggr" />
 		<flow-ref name="call-LongRunningTask" doc:name="Call Long Running Task" />
 		<collection-aggregator failOnTimeout="true"
-			doc:name="Aggregate Gryphon Results" timeout="120000" />
+			doc:name="Aggregate Results" timeout="120000" />
 		<vm:outbound-endpoint exchange-pattern="one-way"
 			path="reply" doc:name="reply" />
 	</flow>
@@ -95,7 +116,7 @@ Let's run the test and see how it works. Well, it doesn't work at all. Let's see
 
 Issue#1: VM endpoint inside request-reply cannot be in transactional scope
 ====
-It is not any black magic. It is highlighted even in official [Mule ESB documentation for Request-Reply Scope](http://www.mulesoft.org/documentation/display/current/Request-Reply+Scope). However documentation says nothing regarding how to fix it. And it turned out to be quite easy - it is enought to disable transaction for request-reply VM endpoints. It doesn't affect process logic at all - HTTP calls are not transactional and final VM outbound endpoint still is within transaction. 
+It turned out to be rather obvious rule. It is highlighted even in official [Mule ESB documentation for Request-Reply Scope](http://www.mulesoft.org/documentation/display/current/Request-Reply+Scope) - warning sign and yellow highlighted note draw attention. However documentation says nothing regarding how to fix it. And it turned out to be quite easy. It is enought to disable transaction for request-reply VM endpoints. It doesn't affect process logic at all - HTTP calls are not transactional and final VM outbound endpoint still is within transaction. Explicit definition of proper vm:transaction action in request-reply scope below:
 {% highlight xml %}
 <request-reply doc:name="Request-Reply">
 	<vm:outbound-endpoint exchange-pattern="one-way"
@@ -128,13 +149,15 @@ INFO  2014-11-19 23:12:11,142 [call-LongRunningTask.stage1.10] LongRunningTask: 
 Issue #2: Set up good processing strategies
 ====
 
-Without processing strategies each stage is executed without waiting on results of previous stage. For the simplicity start with processing both flows synchronously:
+Without processing strategies each stage in the flow is executed without waiting on results of previous stage. For the simplicity let's start with processing both flows synchronously by setting up processing strategy to **synchronous**:
 {% highlight xml %}
 <flow name="request-reply-long-task-split" doc:name="long-task-split" processingStrategy="synchronous">
 ...
 <flow name="request-reply-long-task-aggr" doc:name="long-task-aggr" processingStrategy="synchronous">	
 {% endhighlight %}
-Changes didn't help - process still fails, but this time with exception"
+
+Change didn't help - process still fails, but this time with exception:
+
 {% highlight console %}
 ERROR 2014-11-19 23:37:25,351 [connector.VM.mule.default.receiver.07] org.mule.exception.DefaultMessagingExceptionStrategy: 
 ********************************************************************************
@@ -143,22 +166,45 @@ Code                  : MULE_ERROR--1
 --------------------------------------------------------------------------------
 Exception stack is:
 1. null (org.mule.api.store.ObjectAlreadyExistsException)
-  org.mule.util.store.PartitionedObjectStoreWrapper:48 (http://www.mulesoft.org/docs/site/current3/apidocs/org/mule/api/store/ObjectAlreadyExistsException.html)
+....
 --------------------------------------------------------------------------------
 Root Exception stack trace:
 org.mule.api.store.ObjectAlreadyExistsException
-	at org.mule.util.store.PartitionedObjectStoreWrapper.store(PartitionedObjectStoreWrapper.java:48)
-	at org.mule.util.store.MonitoredObjectStoreWrapper.store(MonitoredObjectStoreWrapper.java:100)
-	at org.mule.routing.requestreply.AbstractAsyncRequestReplyRequester$InternalAsyncReplyMessageProcessor.process(AbstractAsyncRequestReplyRequester.java:324)
-    + 3 more (set debug level logging or '-Dmule.verbose.exceptions=true' for everything)
-********************************************************************************
 {% endhighlight %}
 
 After long and not so easy debugging new issue was identified:
 
-Issue #3: Splitter and foreach uses the same group and sequence id parameters
+Issue #3: If aggregation is needed, avoid nested loops
 ====
-MULE_CORRELATION_SEQUENCE and MULE_CORRELATION_GROUP_SIZE are overwritten between foreach and splitter. The solution would be either to store original values for outer loop and restore them after nested loop is finished or separate those two iterations. It looks better to split two loops. After that looks like solution finally works!
+Mule useses internal properties **MULE_CORRELATION_SEQUENCE** and **MULE_CORRELATION_GROUP_SIZE** for tracing collection elements after split to enable their aggregation. It turned out that those parameters are overwritten by **foreach** and **splitter** steps. The solution would be either to store original values of **MULE_CORRELATION_SEQUENCE** and **MULE_CORRELATION_GROUP_SIZE** in outer loop and restore them after nested loop is finished or separate those two iterations. It looks better to split two loops.  
+
+![Request-Reply-Active-Transaction](/images/real-life-request-reply/request-reply-active-transaction3.png "Request-Reply Gather step")
+{% highlight xml %}
+<flow name="request-reply-flow" doc:name="request-reply-flow">
+		<http:inbound-endpoint exchange-pattern="request-response"
+			host="localhost" port="8181" path="requesReply" doc:name="HTTP" />
+		<transactional action="ALWAYS_BEGIN" doc:name="Transactional">
+			<request-reply doc:name="Request-Reply">
+				<vm:outbound-endpoint exchange-pattern="one-way"
+					path="request" doc:name="VM" >
+					<vm:transaction action="NOT_SUPPORTED"/>
+				</vm:outbound-endpoint>
+				<vm:inbound-endpoint exchange-pattern="one-way"
+					path="reply" doc:name="VM" >
+					<vm:transaction action="NOT_SUPPORTED"/>
+				</vm:inbound-endpoint>	
+			</request-reply>		
+			<foreach batchSize="3">											
+				<vm:outbound-endpoint path="finalMessage" />
+				<logger message="Final Message sent" level="INFO"
+				category="MainFlow" doc:name="Logger" />
+			</foreach>
+			<logger message="All tasks finished: #[payload]" level="INFO"
+				category="MainFlow" doc:name="Logger" />
+	</transactional>
+</flow>
+{% endhighlight %}
+After that change solution finally works es expected!
 
 {% highlight console %}
 INFO  2014-11-20 00:02:39,940 [connector.VM.mule.default.receiver.04] MainFlow: Split chunk of tasks
@@ -189,8 +235,9 @@ INFO  2014-11-20 00:02:44,680 [main] MainFlow: Final Message sent
 INFO  2014-11-20 00:02:44,690 [main] MainFlow: All tasks finished: [org.mule.transport.http.ReleasingInputStream@748f93bb, org.mule.transport.http.ReleasingInputStream@7f2d31af, org.mule.transport.http.ReleasingInputStream@2e7157c7, org.mule.transport.http.ReleasingInputStream@2a43e0ac, org.mule.transport.http.ReleasingInputStream@22d9bc14, org.mule.transport.http.ReleasingInputStream@346f41a9, org.mule.transport.http.ReleasingInputStream@1084f78c, org.mule.transport.http.ReleasingInputStream@25f723b0, org.mule.transport.http.ReleasingInputStream@4aa11206, org.mule.transport.http.ReleasingInputStream@40d60f2]
 {% endhighlight %}
 
-In terms of speed improvment is also significant - right now flows ends within 5 seconds
+*All tasks finished* message is at the end of processing, after all records were enhanced and all final messages were sent.
 
+In terms of processing time improvement is significant - right now flows ends within **5 seconds** for **10** records and just **39 seconds** for **1000** records. There are still hidden bottlenecks in the processing and there is a huge gap for error processing, but that will be the subject of next blog entry.
 
+Source code for the flows and sample [munit](https://github.com/mulesoft/munit) tests are available in (https://github.com/jarent/real-life-request-reply)
 
-- error handling (problems with correlation id containg correlation sequence)
