@@ -241,7 +241,7 @@ INFO  2014-11-20 00:02:44,690 [main] MainFlow: All tasks finished: [org.mule.tra
 
 In terms of processing time improvement is significant - right now flows ends within **5 seconds** for **10** records and just **39 seconds** for **1000** records. Nice improvement comparing to original **1000** seconds. 
 
-There are still hidden bottlenecks in the processing and there is a huge gap for error processing, but that will be the subject of next article.
+There are still hidden bottlenecks in the processing and there is a huge gap for error processing, but that will be the subject of [next article]({% post_url 2015-01-13-mule-esb-request-reply-error-handling %}).
 
 Source code for the flows and sample [munit](https://github.com/mulesoft/munit) tests are available on [github](https://github.com/jarent/real-life-request-reply).
 
