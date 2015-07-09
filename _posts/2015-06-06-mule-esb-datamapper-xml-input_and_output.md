@@ -31,7 +31,7 @@ Output result from the Datamapper mapping looks unexpected:
 </Test>
 {% endhighlight %}
 
-Each attribute is returned as separate nested element. That's not what I configured. Mystery was solved once I checked '''.grf''' mapping configuration file. DataMapper under the hood uses [Clover ETL](http://www.cloveretl.com/) engine for mapping execution. Meaning of configuration is explained in Clover [XML Writer documentation](http://doc.cloveretl.com/documentation/UserGuide/index.jsp?topic=/com.cloveretl.gui.docs/docs/extxmlwriter.html). It turned out that '''<attr name="mapping">''' value is responsible for the issue:
+Each attribute is returned as separate nested element. That's not what I configured. Mystery was solved once I checked '''.grf''' mapping configuration file. DataMapper under the hood uses [Clover ETL](http://www.cloveretl.com/) engine for mapping execution. Meaning of configuration is explained in Clover [XML Writer documentation](http://doc.cloveretl.com/documentation/UserGuide/index.jsp?topic=/com.cloveretl.gui.docs/docs/extxmlwriter.html). It turned out that `<attr name="mapping">` value is responsible for the issue:
 
 {% highlight xml linenos %} 
 <Node cacheInMemory="true" charset="UTF-8" enabled="enabled" fileURL="dict:outputPayload" guiName="XML WRITER" guiX="900" guiY="20" id="EXT_XML_WRITER0" type="EXT_XML_WRITER">
