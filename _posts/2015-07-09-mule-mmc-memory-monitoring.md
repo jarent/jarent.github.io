@@ -74,7 +74,7 @@ import static java.math.MathContext.DECIMAL32
 
 def toMB = {size -> (size/1024/1014).round(DECIMAL32)};
 
-['vmprodesb01', 'vmprodesb02'].each {servername ->
+['xxx01', 'xxx02'].each {servername ->
 try {
 	ThreadContext.put('servername', servername)
 	def svr = applicationContext.getBean("serverManager").getServerByName(servername, false)
