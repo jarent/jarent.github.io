@@ -72,7 +72,7 @@ import com.mulesoft.common.remoting.RemoteContext
 import org.apache.logging.log4j.ThreadContext
 import static java.math.MathContext.DECIMAL32
 
-def toMB = {size -> (size/1024/1014).round(DECIMAL32)};
+def toMB = {size -> (size/1024/1024).round(DECIMAL32)};
 
 ['xxx01', 'xxx02'].each {servername ->
 try {
