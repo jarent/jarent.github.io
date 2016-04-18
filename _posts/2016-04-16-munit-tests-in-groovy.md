@@ -1,6 +1,6 @@
 ---
 layout: post
-title: Munit - tests in groovy
+title: Munit - tests in Groovy
 ---
 If I haven't said that earlier, i will do it now - [Munit](https://docs.mulesoft.com/munit/v/1.1.1/) is great! Being able to easly create isolated unit tests, mocking only selected steps in the flow and verifying not only flow output but also value of payload and properties in the middle of flow processing is priceless for developers.
 
@@ -9,7 +9,7 @@ Still i got some frustration with Java language itself. Groovy looks like a good
 
 ### 1. Maven set-up
 
-- install groovy eclipse plugin
+- install Groovy eclipse plugin
 - create folder src/test/groovy
 - add to pom.xml groovy maneve plugin
 {% highlight xml %}
@@ -67,7 +67,7 @@ Finally I decided to create simple application implementing API adding activity 
 API is definined in RAML, request contains 3 input parameters in JSON format. There is an integration with Salesforce, so application has to deal with error handling. Logic is simple but requires some test coverage. If you want to play with app remember to update /src/main/app/mule-app.properties with your personal username/password/securityToken.
 
 ### 3. Groovy tests
-All 4 tests are in LogSMSTest class. Let me show you how groovy can make Mule unit testing more convinient for developer.
+All 4 tests are in LogSMSTest class. Let me show you how Groovy can make Mule unit testing more convinient for developer.
 
 #### Easy to read
 Being able to avoid not needed parenthesis and semicolons increase test readability - just take a look how fluently test below can be read and understood.
@@ -193,6 +193,6 @@ public void shouldSuccessForValidRequest() {
 {% endhighlight %}
 
 ### 4. Summary
-Munit tests in groovy work good, but not perfect. For example I wish there is an easy way to combine Munit with [Spock](http://spockframework.github.io/spock/docs/1.0/introduction.html). Unfortunately, both testing frameworks requires test class to extend its framework specific parent class, so both of them can't work together. Additionally, comparing to Munit tests in XML, I miss Mule Studion integration, especially test coverage report.
+Munit tests in Groovy work good, but not perfect. For example I wish there is an easy way to combine Munit with [Spock](http://spockframework.github.io/spock/docs/1.0/introduction.html). Unfortunately, both testing frameworks requires test class to extend its framework specific parent class, so both of them can't work together. Additionally, comparing to Munit tests in XML, I miss Mule Studio integration, especially test coverage report.
 
-Nevertheless, after trying writing tests in groovy it is hard to go back to writing tests in Java. Give it a try and see how it works for you. The application and tests are available in [github](https://github.com/jarent/munit-groovy).
+Nevertheless, after trying writing tests in Groovy it is hard to go back to writing tests in Java. Give it a try and see how it works for you. The application and tests are available in [github](https://github.com/jarent/munit-groovy).
