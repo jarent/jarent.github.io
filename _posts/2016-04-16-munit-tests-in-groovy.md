@@ -4,7 +4,7 @@ title: Munit - tests in groovy
 ---
 If I haven't said that earlier, i will do it now - [Munit](https://docs.mulesoft.com/munit/v/1.1.1/) is great! Being able to easly create isolated unit tests, mocking only selected steps in the flow and verifying not only flow output but also value of payload and properties in the middle of flow processing is priceless for developers.
 
-Based on recent releases of library looks like Mulesoft promotes writing Munit tests in XML, thankfully still allowing to do it in [Java](https://docs.mulesoft.com/munit/v/1.1.1/munit-tests-with-java). There are some limitations (not all XML featuures are available), but personally i can live with them. In my opinion tests written that way are more flexible and easier to maintain than the one in XML.
+Based on recent releases of library looks like Mulesoft promotes writing Munit tests in XML, still allowing to do it in [Java](https://docs.mulesoft.com/munit/v/1.1.1/munit-tests-with-java). There are some limitations (not all XML featuures are available), but personally i can live with them. In my opinion tests written that way are more flexible and easier to maintain than the one in XML.
 Still i got some frustration with Java language itself. Groovy looks like a good solution for them. I decided to give it a try and write some Munit tests in Groovy.
 
 ### 1. Maven set-up
@@ -70,7 +70,7 @@ API is definined in RAML, request contains 3 input parameters in JSON format. Th
 All 4 tests are in LogSMSTest class. Let me show you how groovy can make Mule unit testing more convinient for developer.
 
 #### Easy to read
-Being able to avoid not needed parenthesis and semicolons increase test readability.
+Being able to avoid not needed parenthesis and semicolons increase test readability - just take a look how fluently test below can be read and understood.
 
 {% highlight groovy linenos %}
 @Test
@@ -86,7 +86,7 @@ Being able to avoid not needed parenthesis and semicolons increase test readabil
 {% endhighlight %}
 
 #### Easy to debug
-There is no need for extra logging or debugging - failed assertions provide automatically all needed information to identify problem with failed test. You can see below that assertion expected http.status code 401 while flow returned 400.
+There is no need for extra logging or debugging in grooovy tests - failed assertions provide automatically all needed information to identify problem with failed test. You can see below that assertion expected http.status code 401 while flow returned 400.
 
 {% highlight console%}
 Assertion failed:
@@ -121,7 +121,7 @@ assert result.getInboundProperty('http.status') == 401
 {% endhighlight %}
 
 #### Support for multiline string and template
-Imagine that you have complex request that can be used in many test cases that differ only with single value. In Java you will either have to create multiple copies of requests in external resource or import 3rd party template library. Groovy gives it for free and there is no need to read template from external file (althought it is maybe not so good practice after all...)
+Imagine that you have complex request that can be used in many test cases that differ only with single value - happens often with [parametrized tests](https://github.com/TNG/junit-dataprovider). In Java you will either have to create multiple copies of requests in external resource or import 3rd party template library. Groovy gives it for free and there is no need to read template from external file (although it is maybe not so good practice after all - your test code can become messy)
 
 {% highlight groovy linenos %}
 	Template requestTemplate = new groovy.text.SimpleTemplateEngine().createTemplate('''
@@ -138,7 +138,7 @@ Imagine that you have complex request that can be used in many test cases that d
 	{% endhighlight %}
 
 #### Easy JSON parsing
-Assertions with string comparision of whole result works only for simple responses. When complex XML or JSON data is returned, then it has to be parsed in order to create assertions for single field value. Groovy helps with that task with XMLSluper or JSONSlurer classes. Insances of those classes parse string in XML or JSON to map of map and allow accessing values using keys as field names.
+Assertions with string comparision of whole result works nice only for simple responses. When complex XML or JSON data is returned, then it has to be parsed in order to create assertions for single field value. Groovy helps with that task with XMLSluper or JSONSlurer classes. Insances of those classes parse string in XML or JSON to map of map and allow accessing values using keys as field names.
 
 For sample response:
 {% highlight javascript linenos %}
@@ -193,6 +193,6 @@ public void shouldSuccessForValidRequest() {
 {% endhighlight %}
 
 ### 4. Summary
-There are still plenty things to improve. For example i wish there is an easy way to combine Munit with [Spock](http://spockframework.github.io/spock/docs/1.0/introduction.html). Unofrtunatelly, both testing frameworks requires test class to extend its framework specific parent class, so both of them can't work together.
+Munit tests in groovy work good, but not perfect. For example I wish there is an easy way to combine Munit with [Spock](http://spockframework.github.io/spock/docs/1.0/introduction.html). Unfortunately, both testing frameworks requires test class to extend its framework specific parent class, so both of them can't work together. Additionally, comparing to Munit tests in XML, I miss Mule Studion integration, especially test coverage report.
 
-After trying writing tests in groovy it is hard to go back to writing tests in Java - at least for me. Give it a try and see how it works for you. The application and tests are available in [github](https://github.com/jarent/munit-groovy).
+Nevertheless, after trying writing tests in groovy it is hard to go back to writing tests in Java. Give it a try and see how it works for you. The application and tests are available in [github](https://github.com/jarent/munit-groovy).
